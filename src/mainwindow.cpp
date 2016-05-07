@@ -332,41 +332,44 @@ void MainWindow::on_pushButton_Estimating_clicked()
 /* ------------------------------------------------------------------------- */
 void MainWindow::on_pushButton_Reconstruction_clicked()
 {
-    //    pcl::PointCloud<pcl::PointXYZ> cloud;
 
-    //    // Fill in the cloud data
-    //    cloud.width    = 100;
-    //    cloud.height   = 100;
-    //    cloud.is_dense = false;
-    //    cloud.points.resize (cloud.width * cloud.height);
+    Mat K = (Mat_<double>(3,3) << 2000, 0, 0,
+             0, 2000, 0,
+             0, 0, 1);
+    cv::Mat_<double> Kinv;
+    Mat distcoeff = (Mat_<double>(5,1) << 0.0, 0.0, 0.0, 0, 0);
 
-    //    for (size_t i = 0; i < outCloud.size(); ++i)
-    //    {
-    //        cloud.points[i].x = outCloud[i].pt.x;
-    //        cloud.points[i].y = outCloud[i].pt.y;
-    //        cloud.points[i].z = outCloud[i].pt.z;
-    //    }
+    invert(K, Kinv);
 
-    //    pcl::io::savePCDFileASCII ("test.pcd", cloud);
-    //    cout << "generate the pcd file finished" << endl;
+    outCloud.clear();
+    std::vector<cv::KeyPoint> correspImg1Pt;
+
+    TriangulatePoints(img1_very_good_keypoint, img2_very_good_keypoint, K, Kinv,distcoeff, P, P1, outCloud, correspImg1Pt);
     cout << "Generate" << outCloud.size() <<" Points" <<endl;
+
     PointCloudT::Ptr cloud_tmp (new PointCloudT);
     unsigned int size = outCloud.size();
     cout << "Generate" << outCloud.size() <<" Points" <<endl;
     cloud_tmp->resize (size);
 
+
+    std::vector<cv::Vec3b> point_colors;
     // Fill the cloud with random points
     for (size_t i = 0; i < size; ++i)
     {
+
+        cv::Point _pt = correspImg1Pt[i].pt;
+        point_colors.push_back(img1_orig.at<cv::Vec3b>(_pt));
         cloud_tmp->points[i].x = outCloud[i].pt.x;
         cloud_tmp->points[i].y = outCloud[i].pt.y;
         cloud_tmp->points[i].z = outCloud[i].pt.z;
     }
+
     for (size_t i = 0; i < size; ++i)
     {
-        cloud_tmp->points[i].r =255;
-        cloud_tmp->points[i].g =255;
-        cloud_tmp->points[i].b =255;
+        cloud_tmp->points[i].r =point_colors[i].val[0];;
+        cloud_tmp->points[i].g =point_colors[i].val[1];;
+        cloud_tmp->points[i].b =point_colors[i].val[2];;
     }
 
     if (cloud_tmp->is_dense)
