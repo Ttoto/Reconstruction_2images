@@ -44,44 +44,42 @@ cv::Mat GetFundamentalMat(const std::vector<KeyPoint>& imgpts1,
                           const std::vector<KeyPoint>& imgpts2,
                           std::vector<KeyPoint>& imgpts1_good,
                           std::vector<KeyPoint>& imgpts2_good,
-                          std::vector<DMatch>& matches,
-                          std::vector<DMatch>& good_matches
+                          std::vector<DMatch>& matches
                           )
 {
     //Try to eliminate keypoints based on the fundamental matrix
     //(although this is not the proper way to do this)
     vector<uchar> status(imgpts1.size());
-
     std::vector<KeyPoint> keypoints_1, keypoints_2;
-
-    //	undistortPoints(imgpts1, imgpts1, cam_matrix, distortion_coeff);
-    //	undistortPoints(imgpts2, imgpts2, cam_matrix, distortion_coeff);
 
     imgpts1_good.clear(); imgpts2_good.clear();
 
+    //make sure the first 50 matches are good
+    std::nth_element(matches.begin(),
+                     matches.begin()+20,
+                     matches.end());
+
+
     vector<KeyPoint> imgpts1_tmp;
     vector<KeyPoint> imgpts2_tmp;
-    if (matches.size() <= 0) {
-        //points already aligned...
-        imgpts1_tmp = imgpts1;
-        imgpts2_tmp = imgpts2;
-    } else {
-        GetAlignedPointsFromMatch(imgpts1, imgpts2, matches, imgpts1_tmp, imgpts2_tmp);
-    }
+
+    GetAlignedPointsFromMatch(imgpts1, imgpts2, matches, imgpts1_tmp, imgpts2_tmp);
+
 
     Mat F;
-    {
-        vector<Point2f> pts1,pts2;
-        KeyPointsToPoints(imgpts1_tmp, pts1);
-        KeyPointsToPoints(imgpts2_tmp, pts2);
 
-        cout << "pts1 " << pts1.size() << " (orig pts " << imgpts1_tmp.size() << ")" << endl;
-        cout << "pts2 " << pts2.size() << " (orig pts " << imgpts2_tmp.size() << ")" << endl;
+    vector<Point2f> pts1,pts2;
+    KeyPointsToPoints(imgpts1_tmp, pts1);
+    KeyPointsToPoints(imgpts2_tmp, pts2);
 
-        double minVal,maxVal;
-        cv::minMaxIdx(pts1,&minVal,&maxVal);
-        F = findFundamentalMat(pts1, pts2, FM_RANSAC, 0.006 * maxVal, 0.99, status); //threshold from [Snavely07 4.1]
-    }
+    cout << "pts1 " << pts1.size() << " (orig pts " << imgpts1_tmp.size() << ")" << endl;
+    cout << "pts2 " << pts2.size() << " (orig pts " << imgpts2_tmp.size() << ")" << endl;
+
+    double minVal,maxVal;
+    cv::minMaxIdx(pts1,&minVal,&maxVal);
+    F = findFundamentalMat(pts1, pts2, FM_RANSAC, 0.006 * maxVal, 0.99, status); //threshold from [Snavely07 4.1]
+    cout << Mat(F) << endl;
+
 
     vector<DMatch> new_matches;
     cout << "F keeping " << countNonZero(status) << " / " << status.size() << endl;
@@ -96,8 +94,6 @@ cv::Mat GetFundamentalMat(const std::vector<KeyPoint>& imgpts1,
             } else {
                 new_matches.push_back(matches[i]);
             }
-
-            good_matches.push_back(DMatch(imgpts1_good.size()-1,imgpts1_good.size()-1,1.0));
             keypoints_1.push_back(imgpts1_tmp[i]);
             keypoints_2.push_back(imgpts2_tmp[i]);
 
@@ -107,7 +103,25 @@ cv::Mat GetFundamentalMat(const std::vector<KeyPoint>& imgpts1,
     cout << matches.size() << " matches before, " << new_matches.size() << " new matches after Fundamental Matrix\n";
     matches = new_matches; //keep only those points who survived the fundamental matrix
 
+    pts1.clear();
+    pts2.clear();
+    KeyPointsToPoints(imgpts1_tmp, pts1);
+    KeyPointsToPoints(imgpts2_tmp, pts2);
+
+    pts1.erase(pts1.begin()+20,
+               pts1.end());
+
+    pts2.erase(pts2.begin()+20,
+               pts2.end());
+
+    cout<<"pts1"<<pts1.size()<<endl;
+
+    cv::minMaxIdx(pts1,&minVal,&maxVal);
+    F = findFundamentalMat(pts1, pts2, FM_RANSAC, 0.006 * maxVal, 0.99, status); //threshold from [Snavely07 4.1]
+    cout << Mat(F) << endl;
+
     return F;
+
 }
 
 void TakeSVDOfE(Mat_<double>& E, Mat& svd_u, Mat& svd_vt, Mat& svd_w) {
@@ -133,7 +147,7 @@ bool TestTriangulation(const vector<CloudPoint>& pcloud, const Matx34d& P, vecto
     perspectiveTransform(pcloud_pt3d, pcloud_pt3d_projected, P4x4);
 
     status.resize(pcloud.size(),0);
-    for (int i=0; i<pcloud.size(); i++) {
+    for (unsigned int i=0; i<pcloud.size(); i++) {
         status[i] = (pcloud_pt3d_projected[i].z > 0) ? 1 : 0;
     }
     int count = countNonZero(status);
@@ -160,7 +174,7 @@ bool TestTriangulation(const vector<CloudPoint>& pcloud, const Matx34d& P, vecto
         cv::Vec3d x0 = pca.mean;
         double p_to_plane_thresh = sqrt(pca.eigenvalues.at<double>(2));
 
-        for (int i=0; i<pcloud.size(); i++) {
+        for (unsigned int i=0; i<pcloud.size(); i++) {
             Vec3d w = Vec3d(pcloud[i].pt) - x0;
             double D = fabs(nrm.dot(w));
             if(D < p_to_plane_thresh) num_inliers++;
@@ -219,7 +233,6 @@ bool FindCameraMatrices(const Mat& K,
                         Matx34d& P,
                         Matx34d& P1,
                         vector<DMatch>& matches,
-                        vector<DMatch>& good_matches,
                         vector<CloudPoint>& outCloud
                         )
 {
@@ -228,7 +241,7 @@ bool FindCameraMatrices(const Mat& K,
         cout << "Find camera matrices...";
         double t = getTickCount();
 
-        Mat F = GetFundamentalMat(imgpts1,imgpts2,imgpts1_good,imgpts2_good,matches,good_matches);
+        Mat F = GetFundamentalMat(imgpts1,imgpts2,imgpts1_good,imgpts2_good,matches);
         if(matches.size() < 100) { // || ((double)imgpts1_good.size() / (double)imgpts1.size()) < 0.25
             cerr << "not enough inliers after F matrix" << endl;
             return false;
@@ -249,7 +262,7 @@ bool FindCameraMatrices(const Mat& K,
         cout << Mat(E) << endl;
 
         //according to http://en.wikipedia.org/wiki/Essential_matrix#Properties_of_the_essential_matrix
-        if(fabsf(determinant(E)) > 1e-06) {
+        if(fabsf(determinant(E)) > 1e-05) {
             cout << "det(E) != 0 : " << determinant(E) << "\n";
             P1 = 0;
             return false;

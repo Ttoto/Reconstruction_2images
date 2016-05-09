@@ -119,17 +119,9 @@
       <string>Matching</string>
      </property>
     </widget>
-    <widget class="QCheckBox" name="check_view_matching">
-     <property name="text">
-      <string>view matching</string>
-     </property>
-     <property name="checked">
-      <bool>false</bool>
-     </property>
-    </widget>
     <widget class="QCheckBox" name="check_view_good_matching">
      <property name="text">
-      <string>view good matching</string>
+      <string>view matching</string>
      </property>
      <property name="checked">
       <bool>false</bool>
@@ -143,11 +135,6 @@
       <string>Estimating</string>
      </property>
     </widget>
-    <widget class="QCheckBox" name="checkBox">
-     <property name="text">
-      <string>very good matching</string>
-     </property>
-    </widget>
     <widget class="QPushButton" name="pushButton_Reconstruction">
      <property name="enabled">
       <bool>true</bool>
@@ -156,7 +143,7 @@
       <string>Reconstruction</string>
      </property>
     </widget>
-    <widget class="QWidget" name="">
+    <widget class="QWidget" name="layoutWidget">
      <layout class="QHBoxLayout" name="horizontalLayout">
       <item>
        <widget class="QPushButton" name="pushButton_load">

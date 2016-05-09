@@ -70,15 +70,14 @@ private:
     Mat img2_orig;
 
     //matching step1 output
-    vector<KeyPoint> img1_keypoint,img2_keypoint;
+    vector<KeyPoint> imgpts1,imgpts2;
     //matching step2 output img_descriptor
-    Mat img1_descriptor,img2_descriptor;
-    //matching step3 output all_matches good_matches img_good_keypoint
-    vector<DMatch> matches_1;
+    Mat descriptors1,descriptors2;
 
-    //matching filter
-    vector<DMatch> matches_2;
-    vector<KeyPoint> img1_good_keypoint,img2_good_keypoint;
+
+    vector<DMatch> matches;
+    vector<DMatch> metches_best30;
+
 
     //after gaining the fundamental matrix
     vector<DMatch> matches_3;

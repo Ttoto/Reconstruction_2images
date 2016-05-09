@@ -53,15 +53,15 @@ MainWindow::MainWindow(QWidget *parent) :
         cloud_->points[i].b =255;
     }
 
-
     viewer_.reset (new pcl::visualization::PCLVisualizer ("viewer", false));
-    viewer_->setBackgroundColor (0.3, 0.3, 0.3);
+    viewer_->setBackgroundColor (0.1, 0.1, 0.1);
     ui->qvtkWidget->SetRenderWindow (viewer_->getRenderWindow ());
     viewer_->setupInteractor (ui->qvtkWidget->GetInteractor (), ui->qvtkWidget->GetRenderWindow ());
     ui->qvtkWidget->update ();
     viewer_->addPointCloud (cloud_, "cloud");
     viewer_->resetCamera ();
     ui->qvtkWidget->update ();
+
 }
 
 MainWindow::~MainWindow()
@@ -175,7 +175,9 @@ void MainWindow::on_pushButton_Matching_clicked()
     img1_orig = imread(filestr1.toStdString(),CV_LOAD_IMAGE_COLOR);
     img2_orig = imread(filestr2.toStdString(),CV_LOAD_IMAGE_COLOR);
 
+
     Mat img1,img2;
+
     cvtColor(img1_orig, img1, CV_BGR2GRAY);
     cvtColor(img2_orig, img2, CV_BGR2GRAY);
 
@@ -193,37 +195,36 @@ void MainWindow::on_pushButton_Matching_clicked()
     cout<<filestr2.toStdString()<<endl;
 
     if(((access(filestr1.toStdString().c_str(),F_OK))!=-1) &&
-       ((access(filestr2.toStdString().c_str(),F_OK))!=-1))
+            ((access(filestr2.toStdString().c_str(),F_OK))!=-1))
     {
         FileStorage fs1(filestr1.toStdString(), FileStorage::READ);
         FileNode kptFileNode1 = fs1["keypoints"];
-        read( kptFileNode1, img1_keypoint );
-        fs1["Descriptor"] >> img1_descriptor;
+        read( kptFileNode1, imgpts1 );
+        fs1["Descriptor"] >> descriptors1;
         fs1.release();
 
         FileStorage fs2(filestr2.toStdString(), FileStorage::READ);
         FileNode kptFileNode2 = fs2["keypoints"];
-        read( kptFileNode2, img2_keypoint );
-        fs2["Descriptor"] >> img2_descriptor;
+        read( kptFileNode2, imgpts2 );
+        fs2["Descriptor"] >> descriptors2;
         fs2.release();
 
-        cout << "Load keypoint and Descriptor from the files"<<endl;
-        cout<< ui->file_browser_1->currentIndex().data().toString().toStdString() << img1_keypoint.size()<<" key points"<<endl;
-        cout<< ui->file_browser_2->currentIndex().data().toString().toStdString() << img2_keypoint.size()<<" key points"<<endl;
-        cout<< "got the descriptors" <<endl;
+        cout << "Load keypoint and Descriptor from existing data files"<<endl;
+        cout << ui->file_browser_1->currentIndex().data().toString().toStdString()
+             << " has " << imgpts1.size() << " points (descriptors " << descriptors1.rows << ")" << endl;
+        cout << ui->file_browser_2->currentIndex().data().toString().toStdString()
+             << " has " << imgpts2.size() << " points (descriptors " << descriptors2.rows << ")" << endl;
 
     }
     else{
 
-        matching_feature_detector(img1,img2,img1_keypoint,img2_keypoint);
+        matching_get_feature_descriptors(img1,imgpts1,descriptors1);
+        matching_get_feature_descriptors(img2,imgpts2,descriptors2);
+        cout << ui->file_browser_1->currentIndex().data().toString().toStdString()
+             << " has " << imgpts1.size() << " points (descriptors " << descriptors1.rows << ")" << endl;
+        cout << ui->file_browser_2->currentIndex().data().toString().toStdString()
+             << " has " << imgpts2.size() << " points (descriptors " << descriptors2.rows << ")" << endl;
 
-        cout<< ui->file_browser_1->currentIndex().data().toString().toStdString() << img1_keypoint.size()<<" key points"<<endl;
-        cout<< ui->file_browser_2->currentIndex().data().toString().toStdString() << img2_keypoint.size()<<" key points"<<endl;
-
-        cout<<"Extracting descriptors from the keypoint"<<endl;
-        matching_descriptor_extractor(img1,img2,img1_keypoint,img2_keypoint,
-                                      img1_descriptor,img2_descriptor);
-        cout<<" Finished"<<endl;
 
         //saving the keypoint and descriptors into a file, this will save a lot of time when next time use it;
         QString datafilestr;
@@ -232,8 +233,8 @@ void MainWindow::on_pushButton_Matching_clicked()
         datafilestr.append(ui->file_browser_1->currentIndex().data().toString());
         datafilestr.append(".yml");
         cv::FileStorage fs1(datafilestr.toStdString(), FileStorage::WRITE);
-        write( fs1 , "keypoints", img1_keypoint);
-        fs1 << "Descriptor" << img1_descriptor << "distCoeffs";
+        write( fs1 , "keypoints", imgpts1);
+        fs1 << "Descriptor" << descriptors1 << "distCoeffs";
         fs1.release();
 
         datafilestr = ui->path_2->text();
@@ -241,43 +242,30 @@ void MainWindow::on_pushButton_Matching_clicked()
         datafilestr.append(ui->file_browser_2->currentIndex().data().toString());
         datafilestr.append(".yml");
         cv::FileStorage fs2(datafilestr.toStdString(), FileStorage::WRITE);
-        write( fs2 , "keypoints", img2_keypoint);
-        fs2 << "Descriptor" << img2_descriptor << "distCoeffs";
+        write( fs2 , "keypoints", imgpts2);
+        fs2 << "Descriptor" << descriptors2 << "distCoeffs";
         fs2.release();
     }
 
 
 
 
-    matching_fb_matcher(img1_descriptor,img2_descriptor,matches_1);
+    matching_fb_matcher(descriptors1,descriptors2,matches);
 
 
-    if(ui->check_view_matching->isChecked())
-    {
-        Mat img_matches;
-        drawMatches( img1_orig, img1_keypoint, img2_orig, img2_keypoint,
-                     matches_1, img_matches, Scalar::all(-1), Scalar::all(-1),
-                     vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
-        //-- Show detected matches
-        cv::namedWindow("All Matches", CV_WINDOW_NORMAL);
-        imshow( "All Matches", img_matches );
-        //waitKey(100);
-        //destroyWindow("Feature Matches");
-    }
 
-    matching_good_matching_filter(matches_1,matches_2,
-                                  img1_keypoint,img2_keypoint,
-                                  img1_good_keypoint,img2_good_keypoint);
+    matching_good_matching_filter(matches,
+                                  imgpts1,imgpts2);
 
     if(ui->check_view_good_matching->isChecked())
     {
         Mat img_matches;
-        drawMatches( img1_orig, img1_keypoint, img2_orig, img2_keypoint,
-                     matches_2, img_matches, Scalar::all(-1), Scalar::all(-1),
+        drawMatches( img1_orig, imgpts1, img2_orig, imgpts2,
+                     matches, img_matches, Scalar::all(-1), Scalar::all(-1),
                      vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
         //-- Show detected matches
-        cv::namedWindow("Good Matches", CV_WINDOW_NORMAL);
-        imshow( "Good Matches", img_matches );
+        cv::namedWindow("All Matches", CV_WINDOW_NORMAL);
+        imshow( "All Matches", img_matches );
     }
 
     ui->pushButton_Estimating->setEnabled(true);
@@ -292,12 +280,14 @@ void MainWindow::on_pushButton_Matching_clicked()
 /* ------------------------------------------------------------------------- */
 void MainWindow::on_pushButton_Estimating_clicked()
 {
-    //    GetFundamentalMat(img1_keypoint,img2_keypoint,
-    //                      img1_very_good_keypoint,img2_very_good_keypoint,
-    //                      matches_2,matches_3);
-    Mat K = (Mat_<double>(3,3) << 2000, 0, 0,
-             0, 2000, 0,
-             0, 0, 1);
+
+    Mat K = (Mat_<double>(3,3) << 2759.48, 0, 1520.69,
+                 0, 2764.16, 1006.81,
+                 0, 0, 1);
+
+    //    Mat K = (Mat_<double>(3,3) << 1500, 0, 0,
+    //             0, 1500, 0,
+    //             0, 0, 1);
     cv::Mat_<double> Kinv;
     Mat distcoeff = (Mat_<double>(5,1) << 0.0, 0.0, 0.0, 0, 0);
 
@@ -312,10 +302,10 @@ void MainWindow::on_pushButton_Estimating_clicked()
                      0,0,1,0);
 
     FindCameraMatrices(K,Kinv,distcoeff,
-                       img1_keypoint,img2_keypoint,
+                       imgpts1,imgpts2,
                        img1_very_good_keypoint,img2_very_good_keypoint,
                        P,P1,
-                       matches_2,matches_3,
+                       matches,
                        outCloud);
 
     cout<<endl;
@@ -333,9 +323,12 @@ void MainWindow::on_pushButton_Estimating_clicked()
 void MainWindow::on_pushButton_Reconstruction_clicked()
 {
 
-    Mat K = (Mat_<double>(3,3) << 2000, 0, 0,
-             0, 2000, 0,
-             0, 0, 1);
+    Mat K = (Mat_<double>(3,3) << 2759.48, 0, 1520.69,
+                 0, 2764.16, 1006.81,
+                 0, 0, 1);
+    //        Mat K = (Mat_<double>(3,3) << 1500, 0, 0,
+    //                 0, 1500, 0,
+    //                 0, 0, 1);
     cv::Mat_<double> Kinv;
     Mat distcoeff = (Mat_<double>(5,1) << 0.0, 0.0, 0.0, 0, 0);
 
