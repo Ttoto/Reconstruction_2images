@@ -26,7 +26,7 @@ Mat_<double> LinearLSTriangulation(Point3d u,		//homogenous image point (u,v,1)
     //	A(0) = u.x*P(2)-P(0);
     //	A(1) = u.y*P(2)-P(1);
     //	A(2) = u1.x*P1(2)-P1(0);
-    //	A(3) = u1.y*P1(2)-P1(1);
+    //	A(3) = u1.y*P1(2)-P1(1);z
     Matx43d A(u.x*P(2,0)-P(0,0),	u.x*P(2,1)-P(0,1),		u.x*P(2,2)-P(0,2),
               u.y*P(2,0)-P(1,0),	u.y*P(2,1)-P(1,1),		u.y*P(2,2)-P(1,2),
               u1.x*P1(2,0)-P1(0,0), u1.x*P1(2,1)-P1(0,1),	u1.x*P1(2,2)-P1(0,2),

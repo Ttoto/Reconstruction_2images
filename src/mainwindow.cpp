@@ -62,6 +62,11 @@ MainWindow::MainWindow(QWidget *parent) :
     viewer_->resetCamera ();
     ui->qvtkWidget->update ();
 
+    K = (Mat_<double>(3,3) << 2759.48, 0, 1520.69,
+                     0, 2764.16, 1006.81,
+                     0, 0, 1);
+    distcoeff = (Mat_<double>(5,1) << 0.0, 0.0, 0.0, 0, 0);
+
 }
 
 MainWindow::~MainWindow()
@@ -162,6 +167,7 @@ void MainWindow::on_file_browser_2_clicked(const QModelIndex &index)
 void MainWindow::on_pushButton_Matching_clicked()
 {
     cv::initModule_nonfree();
+
     QString filestr1;
     filestr1 = ui->path_1->text();
     filestr1.append("/");
@@ -177,7 +183,6 @@ void MainWindow::on_pushButton_Matching_clicked()
 
 
     Mat img1,img2;
-
     cvtColor(img1_orig, img1, CV_BGR2GRAY);
     cvtColor(img2_orig, img2, CV_BGR2GRAY);
 
@@ -191,71 +196,33 @@ void MainWindow::on_pushButton_Matching_clicked()
     filestr2.append(ui->file_browser_2->currentIndex().data().toString());
     filestr2.append(".yml");
 
-    cout<<filestr1.toStdString()<<endl;
-    cout<<filestr2.toStdString()<<endl;
-
+    //get the keypoint and descriptions
     if(((access(filestr1.toStdString().c_str(),F_OK))!=-1) &&
             ((access(filestr2.toStdString().c_str(),F_OK))!=-1))
     {
-        FileStorage fs1(filestr1.toStdString(), FileStorage::READ);
-        FileNode kptFileNode1 = fs1["keypoints"];
-        read( kptFileNode1, imgpts1 );
-        fs1["Descriptor"] >> descriptors1;
-        fs1.release();
-
-        FileStorage fs2(filestr2.toStdString(), FileStorage::READ);
-        FileNode kptFileNode2 = fs2["keypoints"];
-        read( kptFileNode2, imgpts2 );
-        fs2["Descriptor"] >> descriptors2;
-        fs2.release();
-
-        cout << "Load keypoint and Descriptor from existing data files"<<endl;
-        cout << ui->file_browser_1->currentIndex().data().toString().toStdString()
-             << " has " << imgpts1.size() << " points (descriptors " << descriptors1.rows << ")" << endl;
-        cout << ui->file_browser_2->currentIndex().data().toString().toStdString()
-             << " has " << imgpts2.size() << " points (descriptors " << descriptors2.rows << ")" << endl;
-
+        restore_descriptors_from_file(filestr1.toStdString(),imgpts1,descriptors1);
+        restore_descriptors_from_file(filestr2.toStdString(),imgpts2,descriptors2);
     }
     else{
 
         matching_get_feature_descriptors(img1,imgpts1,descriptors1);
         matching_get_feature_descriptors(img2,imgpts2,descriptors2);
-        cout << ui->file_browser_1->currentIndex().data().toString().toStdString()
-             << " has " << imgpts1.size() << " points (descriptors " << descriptors1.rows << ")" << endl;
-        cout << ui->file_browser_2->currentIndex().data().toString().toStdString()
-             << " has " << imgpts2.size() << " points (descriptors " << descriptors2.rows << ")" << endl;
 
-
-        //saving the keypoint and descriptors into a file, this will save a lot of time when next time use it;
-        QString datafilestr;
-        datafilestr = ui->path_1->text();
-        datafilestr.append("/data/");
-        datafilestr.append(ui->file_browser_1->currentIndex().data().toString());
-        datafilestr.append(".yml");
-        cv::FileStorage fs1(datafilestr.toStdString(), FileStorage::WRITE);
-        write( fs1 , "keypoints", imgpts1);
-        fs1 << "Descriptor" << descriptors1 << "distCoeffs";
-        fs1.release();
-
-        datafilestr = ui->path_2->text();
-        datafilestr.append("/data/");
-        datafilestr.append(ui->file_browser_2->currentIndex().data().toString());
-        datafilestr.append(".yml");
-        cv::FileStorage fs2(datafilestr.toStdString(), FileStorage::WRITE);
-        write( fs2 , "keypoints", imgpts2);
-        fs2 << "Descriptor" << descriptors2 << "distCoeffs";
-        fs2.release();
+        save_descriptors_to_file(filestr1.toStdString(),imgpts1,descriptors1);
+        save_descriptors_to_file(filestr2.toStdString(),imgpts2,descriptors2);
     }
 
+    cout << filestr1.toStdString() << " has " << imgpts1.size()
+                 << " points (descriptors " << descriptors1.rows << ")" << endl;
+    cout << filestr2.toStdString() << " has " << imgpts2.size()
+                 << " points (descriptors " << descriptors2.rows << ")" << endl;
 
 
-
+    //matching the descriptors
     matching_fb_matcher(descriptors1,descriptors2,matches);
 
+    matching_good_matching_filter(matches);
 
-
-    matching_good_matching_filter(matches,
-                                  imgpts1,imgpts2);
 
     if(ui->check_view_good_matching->isChecked())
     {
@@ -281,18 +248,6 @@ void MainWindow::on_pushButton_Matching_clicked()
 void MainWindow::on_pushButton_Estimating_clicked()
 {
 
-    Mat K = (Mat_<double>(3,3) << 2759.48, 0, 1520.69,
-                 0, 2764.16, 1006.81,
-                 0, 0, 1);
-
-    //    Mat K = (Mat_<double>(3,3) << 1500, 0, 0,
-    //             0, 1500, 0,
-    //             0, 0, 1);
-    cv::Mat_<double> Kinv;
-    Mat distcoeff = (Mat_<double>(5,1) << 0.0, 0.0, 0.0, 0, 0);
-
-
-
     invert(K, Kinv);
     P = cv::Matx34d(1,0,0,0,
                     0,1,0,0,
@@ -313,26 +268,9 @@ void MainWindow::on_pushButton_Estimating_clicked()
 }
 
 
-/* ------------------------------------------------------------------------- */
-/** \fn MainWindow::on_pushButton_Reconstruction_clicked()
-*
-* \brief Reconstruction the point cloud
-*
-*/
-/* ------------------------------------------------------------------------- */
 void MainWindow::on_pushButton_Reconstruction_clicked()
 {
 
-    Mat K = (Mat_<double>(3,3) << 2759.48, 0, 1520.69,
-                 0, 2764.16, 1006.81,
-                 0, 0, 1);
-    //        Mat K = (Mat_<double>(3,3) << 1500, 0, 0,
-    //                 0, 1500, 0,
-    //                 0, 0, 1);
-    cv::Mat_<double> Kinv;
-    Mat distcoeff = (Mat_<double>(5,1) << 0.0, 0.0, 0.0, 0, 0);
-
-    invert(K, Kinv);
 
     outCloud.clear();
     std::vector<cv::KeyPoint> correspImg1Pt;
@@ -371,6 +309,7 @@ void MainWindow::on_pushButton_Reconstruction_clicked()
     viewer_->updatePointCloud (cloud_, "cloud");
     viewer_->resetCamera ();
     ui->qvtkWidget->update ();
+
 }
 
 
@@ -410,6 +349,7 @@ void MainWindow::on_pushButton_load_clicked()
     viewer_->updatePointCloud (cloud_, "cloud");
     viewer_->resetCamera ();
     ui->qvtkWidget->update ();
+
 }
 
 

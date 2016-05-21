@@ -22,21 +22,8 @@ void matching_fb_matcher(const Mat& descriptors_1,
                          const Mat& descriptors_2,
                          vector<DMatch>& matches);
 
-void matching_good_matching_filter( vector<DMatch>& matches,
-                                    vector<KeyPoint> imgpts1,
-                                    vector<KeyPoint> imgpts2);
+void matching_good_matching_filter( vector<DMatch>& matches);
 
-//void matching_feature_detector(const Mat& img1,
-//                               const Mat& img2,
-//                               vector<KeyPoint>& keypoint1,
-//                               vector<KeyPoint>& keypoint2
-//                               );
-//void matching_descriptor_extractor(const Mat& img1,
-//                                   const Mat& img2,
-//                                   vector<KeyPoint>& keypoint1,
-//                                   vector<KeyPoint>& keypoint2,
-//                                   Mat& descriptors_1,
-//                                   Mat& descriptors_2);
 
 
 #endif // MATCHING_H

@@ -79,9 +79,18 @@ private:
     vector<DMatch> metches_best30;
 
 
+
     //after gaining the fundamental matrix
     vector<DMatch> matches_3;
     vector<KeyPoint> img1_very_good_keypoint,img2_very_good_keypoint;
+
+    Mat K;
+
+    //    Mat K = (Mat_<double>(3,3) << 1500, 0, 0,
+    //             0, 1500, 0,
+    //             0, 0, 1);
+    cv::Mat_<double> Kinv;
+    Mat distcoeff;
 
     cv::Matx34d P;
     cv::Matx34d P1;

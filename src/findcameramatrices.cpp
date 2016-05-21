@@ -54,12 +54,6 @@ cv::Mat GetFundamentalMat(const std::vector<KeyPoint>& imgpts1,
 
     imgpts1_good.clear(); imgpts2_good.clear();
 
-    //make sure the first 50 matches are good
-    std::nth_element(matches.begin(),
-                     matches.begin()+20,
-                     matches.end());
-
-
     vector<KeyPoint> imgpts1_tmp;
     vector<KeyPoint> imgpts2_tmp;
 
@@ -103,25 +97,7 @@ cv::Mat GetFundamentalMat(const std::vector<KeyPoint>& imgpts1,
     cout << matches.size() << " matches before, " << new_matches.size() << " new matches after Fundamental Matrix\n";
     matches = new_matches; //keep only those points who survived the fundamental matrix
 
-    pts1.clear();
-    pts2.clear();
-    KeyPointsToPoints(imgpts1_tmp, pts1);
-    KeyPointsToPoints(imgpts2_tmp, pts2);
-
-    pts1.erase(pts1.begin()+20,
-               pts1.end());
-
-    pts2.erase(pts2.begin()+20,
-               pts2.end());
-
-    cout<<"pts1"<<pts1.size()<<endl;
-
-    cv::minMaxIdx(pts1,&minVal,&maxVal);
-    F = findFundamentalMat(pts1, pts2, FM_RANSAC, 0.006 * maxVal, 0.99, status); //threshold from [Snavely07 4.1]
-    cout << Mat(F) << endl;
-
     return F;
-
 }
 
 void TakeSVDOfE(Mat_<double>& E, Mat& svd_u, Mat& svd_vt, Mat& svd_w) {
@@ -262,7 +238,7 @@ bool FindCameraMatrices(const Mat& K,
         cout << Mat(E) << endl;
 
         //according to http://en.wikipedia.org/wiki/Essential_matrix#Properties_of_the_essential_matrix
-        if(fabsf(determinant(E)) > 1e-05) {
+        if(fabsf(determinant(E)) > 1e-06) {
             cout << "det(E) != 0 : " << determinant(E) << "\n";
             P1 = 0;
             return false;

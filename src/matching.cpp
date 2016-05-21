@@ -17,6 +17,7 @@ void matching_get_feature_descriptors(const Mat& img,
 }
 
 
+
 //FlannBasedMatcher matcher;
 void matching_fb_matcher(const Mat& descriptors_1,
                          const Mat& descriptors_2,
@@ -26,11 +27,8 @@ void matching_fb_matcher(const Mat& descriptors_1,
     matcher.match( descriptors_1, descriptors_2, matches );
 }
 
-void matching_good_matching_filter( vector<DMatch>& matches,
-                                    vector<KeyPoint> imgpts1,
-                                    vector<KeyPoint> imgpts2)
+void matching_good_matching_filter(vector<DMatch>& matches)
 {
-    vector<KeyPoint> imgpts1_good,imgpts2_good;
     vector<DMatch> good_matches;
     int sizebf = matches.size();//size of matches before filter
 
@@ -54,26 +52,18 @@ void matching_good_matching_filter( vector<DMatch>& matches,
     //               queryIdx       trainIdx
 
     //double cutoff = min_dist+(max_dist-min_dist)*0.2;
-    double cutoff = min_dist*6;
-    std::set<int> existing_trainIdx;
+    double cutoff = min_dist*4;
+
     for(unsigned int i = 0; i < matches.size(); i++ )
     {
         if(matches[i].distance > 0.0 && matches[i].distance < cutoff )
         {
             good_matches.push_back( matches[i]);
-            imgpts1_good.push_back(imgpts1[matches[i].queryIdx]);
-            imgpts2_good.push_back(imgpts2[matches[i].trainIdx]);
-            existing_trainIdx.insert(matches[i].trainIdx);
         }
     }
 
     matches.clear();
-    imgpts1.clear();
-    imgpts2.clear();
-
     matches = good_matches;
-    imgpts1=imgpts1_good;
-    imgpts2=imgpts2_good;
 
     int sizeexist = matches.size();
 

@@ -31,3 +31,25 @@ void GetAlignedPointsFromMatch(const std::vector<cv::KeyPoint>& imgpts1,
         pt_set2.push_back(imgpts2[matches[i].trainIdx]);
     }
 }
+
+
+void save_descriptors_to_file(const std::string& filename,
+                              const std::vector<cv::KeyPoint>& imgpts,
+                              const cv::Mat& descriptors)
+{
+    cv::FileStorage fs(filename, FileStorage::WRITE);
+    write( fs , "keypoints", imgpts);
+    write( fs , "Descriptor", descriptors);
+    fs.release();
+}
+
+void restore_descriptors_from_file(const std::string& filename,
+                                   std::vector<cv::KeyPoint>& imgpts,
+                                   cv::Mat& descriptors)
+{
+    cv::FileStorage fs(filename, FileStorage::READ);
+    FileNode kptFileNode = fs["keypoints"];
+    read( kptFileNode, imgpts );
+    fs["Descriptor"] >> descriptors;
+    fs.release();
+}
