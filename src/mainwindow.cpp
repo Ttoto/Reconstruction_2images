@@ -35,37 +35,12 @@ MainWindow::MainWindow(QWidget *parent) :
     this->image1 = new QImage();
     this->image2 = new QImage();
 
-    cloud_.reset (new PointCloudT);
-    // The number of points in the cloud
-    cloud_->resize (1000);
-
-    // Fill the cloud with random points
-    for (size_t i = 0; i < cloud_->points.size (); ++i)
-    {
-        cloud_->points[i].x = 1024 * (rand () / (RAND_MAX + 1.0f));
-        cloud_->points[i].y = 1024 * (rand () / (RAND_MAX + 1.0f));
-        cloud_->points[i].z = 1024 * (rand () / (RAND_MAX + 1.0f));
-    }
-    for (size_t i = 0; i < cloud_->points.size (); ++i)
-    {
-        cloud_->points[i].r =255;
-        cloud_->points[i].g =255;
-        cloud_->points[i].b =255;
-    }
-
-    viewer_.reset (new pcl::visualization::PCLVisualizer ("viewer", false));
-    viewer_->setBackgroundColor (0.1, 0.1, 0.1);
-    ui->qvtkWidget->SetRenderWindow (viewer_->getRenderWindow ());
-    viewer_->setupInteractor (ui->qvtkWidget->GetInteractor (), ui->qvtkWidget->GetRenderWindow ());
-    ui->qvtkWidget->update ();
-    viewer_->addPointCloud (cloud_, "cloud");
-    viewer_->resetCamera ();
-    ui->qvtkWidget->update ();
-
     K = (Mat_<double>(3,3) << 2759.48, 0, 1520.69,
-                     0, 2764.16, 1006.81,
-                     0, 0, 1);
+         0, 2764.16, 1006.81,
+         0, 0, 1);
     distcoeff = (Mat_<double>(5,1) << 0.0, 0.0, 0.0, 0, 0);
+
+    imgpts.clear();
 
 }
 
@@ -213,9 +188,9 @@ void MainWindow::on_pushButton_Matching_clicked()
     }
 
     cout << filestr1.toStdString() << " has " << imgpts1.size()
-                 << " points (descriptors " << descriptors1.rows << ")" << endl;
+         << " points (descriptors " << descriptors1.rows << ")" << endl;
     cout << filestr2.toStdString() << " has " << imgpts2.size()
-                 << " points (descriptors " << descriptors2.rows << ")" << endl;
+         << " points (descriptors " << descriptors2.rows << ")" << endl;
 
 
     //matching the descriptors
@@ -235,20 +210,17 @@ void MainWindow::on_pushButton_Matching_clicked()
         imshow( "All Matches", img_matches );
     }
 
-    ui->pushButton_Estimating->setEnabled(true);
+    ui->pushButton_Reconstruction->setEnabled(true);
 }
 
-/* ------------------------------------------------------------------------- */
-/** \fn MainWindow::on_pushButton_Estimating_clicked()
-*
-* \brief Estimating the P and P1 matrix
-*
-*/
-/* ------------------------------------------------------------------------- */
-void MainWindow::on_pushButton_Estimating_clicked()
+
+
+
+void MainWindow::on_pushButton_Reconstruction_clicked()
 {
 
     invert(K, Kinv);
+
     P = cv::Matx34d(1,0,0,0,
                     0,1,0,0,
                     0,0,1,0);
@@ -265,12 +237,6 @@ void MainWindow::on_pushButton_Estimating_clicked()
 
     cout<<endl;
     cout<<"sizeof outCloud is "<< outCloud.size()<<endl;
-}
-
-
-void MainWindow::on_pushButton_Reconstruction_clicked()
-{
-
 
     outCloud.clear();
     std::vector<cv::KeyPoint> correspImg1Pt;
@@ -278,82 +244,86 @@ void MainWindow::on_pushButton_Reconstruction_clicked()
     TriangulatePoints(img1_very_good_keypoint, img2_very_good_keypoint, K, Kinv,distcoeff, P, P1, outCloud, correspImg1Pt);
     cout << "Generate" << outCloud.size() <<" Points" <<endl;
 
-    PointCloudT::Ptr cloud_tmp (new PointCloudT);
-    unsigned int size = outCloud.size();
-    cout << "Generate" << outCloud.size() <<" Points" <<endl;
-    cloud_tmp->resize (size);
+    imgpts.resize(2);
 
+    imgpts[0] = imgpts1;
+    imgpts[1] = imgpts2;
 
-    std::vector<cv::Vec3b> point_colors;
-    // Fill the cloud with random points
-    for (size_t i = 0; i < size; ++i)
+    imgs_orig.resize(2);
+    imgs_orig[0] = img1_orig;
+    imgs_orig[1] = img2_orig;
+
+    Pmats[0] = P;
+    Pmats[1] = P1;
+
+    for (unsigned int i=0; i<outCloud.size(); i++)
     {
+        //cout << "surving" << endl;
+        outCloud[i].imgpt_for_img.resize(2);
 
-        cv::Point _pt = correspImg1Pt[i].pt;
-        point_colors.push_back(img1_orig.at<cv::Vec3b>(_pt));
-        cloud_tmp->points[i].x = outCloud[i].pt.x;
-        cloud_tmp->points[i].y = outCloud[i].pt.y;
-        cloud_tmp->points[i].z = outCloud[i].pt.z;
+        outCloud[i].imgpt_for_img[0] = matches[i].queryIdx;
+        outCloud[i].imgpt_for_img[1] = matches[i].trainIdx;
     }
+    cout << "size of matches" << matches.size() <<endl;
 
-    for (size_t i = 0; i < size; ++i)
-    {
-        cloud_tmp->points[i].r =point_colors[i].val[0];;
-        cloud_tmp->points[i].g =point_colors[i].val[1];;
-        cloud_tmp->points[i].b =point_colors[i].val[2];;
-    }
-
-    if (cloud_tmp->is_dense)
-        pcl::copyPointCloud (*cloud_tmp, *cloud_);
-
-    viewer_->updatePointCloud (cloud_, "cloud");
-    viewer_->resetCamera ();
-    ui->qvtkWidget->update ();
-
+    GetRGBForPointCloud(outCloud,pointCloudRGB);
+    ui->Result_viewer->update(getPointCloud(),
+                              getPointCloudRGB(),
+                              getCameras());
 }
 
 
-void MainWindow::on_pushButton_load_clicked()
+void MainWindow::GetRGBForPointCloud(
+        const std::vector<struct CloudPoint>& _pcloud,
+        std::vector<cv::Vec3b>& RGBforCloud
+        )
 {
-    QString filename = QFileDialog::getOpenFileName (this, tr ("Open point cloud"), "/home/", tr ("Point cloud data (*.pcd *.ply)"));
+    RGBforCloud.resize(_pcloud.size());
+    for (unsigned int i=0; i<_pcloud.size(); i++) {
+        unsigned int good_view = 0;
+        std::vector<cv::Vec3b> point_colors;
+        for(; good_view < imgs_orig.size(); good_view++) {
+            if(_pcloud[i].imgpt_for_img[good_view] != -1) {
+                int pt_idx = _pcloud[i].imgpt_for_img[good_view];
+                if(pt_idx >= imgpts[good_view].size()) {
+                    std::cerr << "BUG: point id:" << pt_idx << " should not exist for img #" << good_view << " which has only " << imgpts[good_view].size() << std::endl;
+                    continue;
+                }
+                cv::Point _pt = imgpts[good_view][pt_idx].pt;
+                assert(good_view < imgs_orig.size() && _pt.x < imgs_orig[good_view].cols && _pt.y < imgs_orig[good_view].rows);
 
-    PCL_INFO("File chosen: %s\n", filename.toStdString ().c_str ());
-    PointCloudT::Ptr cloud_tmp (new PointCloudT);
+                point_colors.push_back(imgs_orig[good_view].at<cv::Vec3b>(_pt));
 
-    if (filename.isEmpty ())
-        return;
-
-    int return_status;
-    if (filename.endsWith (".pcd", Qt::CaseInsensitive))
-        return_status = pcl::io::loadPCDFile (filename.toStdString (), *cloud_tmp);
-    else
-        return_status = pcl::io::loadPLYFile (filename.toStdString (), *cloud_tmp);
-
-    if (return_status != 0)
-    {
-        PCL_ERROR("Error reading point cloud %s\n", filename.toStdString ().c_str ());
-        return;
+                //				std::stringstream ss; ss << "patch " << good_view;
+                //				imshow_250x250(ss.str(), imgs_orig[good_view](cv::Range(_pt.y-10,_pt.y+10),cv::Range(_pt.x-10,_pt.x+10)));
+            }
+        }
+        //		cv::waitKey(0);
+        cv::Scalar res_color = cv::mean(point_colors);
+        RGBforCloud[i] = (cv::Vec3b(res_color[0],res_color[1],res_color[2])); //bgr2rgb
+//        if(good_view == imgs.size()) //nothing found.. put red dot
+//            RGBforCloud.push_back(cv::Vec3b(255,0,0));
     }
-
-    // If point cloud contains NaN values, remove them before updating the visualizer point cloud
-    if (cloud_tmp->is_dense)
-        pcl::copyPointCloud (*cloud_tmp, *cloud_);
-    else
-    {
-        PCL_WARN("Cloud is not dense! Non finite points will be removed\n");
-        std::vector<int> vec;
-        pcl::removeNaNFromPointCloud (*cloud_tmp, *cloud_, vec);
-    }
-
-    //colorCloudDistances ();
-    viewer_->updatePointCloud (cloud_, "cloud");
-    viewer_->resetCamera ();
-    ui->qvtkWidget->update ();
-
 }
 
 
+//pop the data to the visualization module
+std::vector<cv::Point3d> MainWindow::getPointCloud()
+{
+    return CloudPointsToPoints(outCloud);
+}
 
+const std::vector<cv::Vec3b>& MainWindow::getPointCloudRGB()
+{
+    return pointCloudRGB;
+}
 
-
-
+std::vector<cv::Matx34d> MainWindow::getCameras()
+{
+    std::vector<cv::Matx34d> v;
+    for(std::map<int ,cv::Matx34d>::const_iterator it = Pmats.begin(); it != Pmats.end(); ++it )
+    {
+        v.push_back( it->second );
+    }
+    return v;
+}

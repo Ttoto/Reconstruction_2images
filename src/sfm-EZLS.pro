@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT       += core gui
+QT       += core gui opengl xml widgets
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -19,14 +19,14 @@ SOURCES +=  main.cpp               \
             findcameramatrices.cpp \
             common.cpp             \
             Triangulation.cpp \
-    visualization.cpp
+            sfmviewer.cpp
 
 HEADERS  += mainwindow.h           \
             matching.h             \
             findcameramatrices.h   \
             common.h               \
             Triangulation.h \
-    visualization.h
+            sfmviewer.h
 
 FORMS    += mainwindow.ui
 
@@ -40,8 +40,7 @@ INCLUDEPATH +=  "/usr/include/pcl-1.7/"    \
                 "/usr/include/pcl-1.7/pcl" \
                 "/usr/include/flann/"      \
                 "/usr/include/eigen3/"     \
-                "/usr/include/vtk-5.8"     \
-                "/usr/include/boost"
+
 
 
 LIBS += -lpcl_common            \
@@ -54,19 +53,13 @@ LIBS += -lpcl_common            \
         -lpcl_octree            \
         -lpcl_outofcore         \
         -lpcl_features          \
-#        -lpcl_segmentation      \
-#        -lpcl_people            \
-#        -lpcl_recognition       \
-#        -lpcl_registration      \
-#        -lpcl_sample_consensus  \
-#        -lpcl_search            \
-#        -lpcl_surface           \
-#        -lpcl_tracking          \
         -lpcl_visualization     \
-        -lflann      \
-        -lqhull     \
+        -lflann                 \
+        -lqhull                 \
         -lboost_system          \
-        -lQVTK \
-        -lvtkCommon \
-        -lvtkFiltering \
-        -lvtkRendering \
+
+
+INCLUDEPATH += /home/sy/lib/libQGLViewer-2.6.3
+LIBS += -L/home/sy/lib/libQGLViewer-2.6.3/QGLViewer
+LIBS += -lQGLViewer
+LIBS += -lglut

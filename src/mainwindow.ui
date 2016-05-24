@@ -80,35 +80,13 @@
      </item>
     </layout>
    </widget>
-   <widget class="QVTKWidget" name="qvtkWidget" native="true">
-    <property name="geometry">
-     <rect>
-      <x>720</x>
-      <y>10</y>
-      <width>640</width>
-      <height>480</height>
-     </rect>
-    </property>
-    <property name="sizePolicy">
-     <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-      <horstretch>50</horstretch>
-      <verstretch>0</verstretch>
-     </sizepolicy>
-    </property>
-    <property name="minimumSize">
-     <size>
-      <width>640</width>
-      <height>480</height>
-     </size>
-    </property>
-   </widget>
    <widget class="QSplitter" name="splitter">
     <property name="geometry">
      <rect>
       <x>520</x>
       <y>10</y>
       <width>191</width>
-      <height>241</height>
+      <height>161</height>
      </rect>
     </property>
     <property name="orientation">
@@ -125,14 +103,6 @@
      </property>
      <property name="checked">
       <bool>false</bool>
-     </property>
-    </widget>
-    <widget class="QPushButton" name="pushButton_Estimating">
-     <property name="enabled">
-      <bool>false</bool>
-     </property>
-     <property name="text">
-      <string>Estimating</string>
      </property>
     </widget>
     <widget class="QPushButton" name="pushButton_Reconstruction">
@@ -162,6 +132,16 @@
      </layout>
     </widget>
    </widget>
+   <widget class="SFMViewer" name="Result_viewer" native="true">
+    <property name="geometry">
+     <rect>
+      <x>720</x>
+      <y>10</y>
+      <width>651</width>
+      <height>481</height>
+     </rect>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menuBar">
    <property name="geometry">
@@ -186,9 +166,10 @@
  <layoutdefault spacing="6" margin="11"/>
  <customwidgets>
   <customwidget>
-   <class>QVTKWidget</class>
+   <class>SFMViewer</class>
    <extends>QWidget</extends>
-   <header>QVTKWidget.h</header>
+   <header>sfmviewer.h</header>
+   <container>1</container>
   </customwidget>
  </customwidgets>
  <resources/>

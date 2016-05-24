@@ -96,9 +96,6 @@ double TriangulatePoints(const vector<KeyPoint>& pt_set1,
                         vector<CloudPoint>& pointcloud,
                         vector<KeyPoint>& correspImg1Pt)
 {
-#ifdef __SFM__DEBUG__
-    vector<double> depths;
-#endif
 
 //	pointcloud.clear();
     correspImg1Pt.clear();
@@ -114,42 +111,9 @@ double TriangulatePoints(const vector<KeyPoint>& pt_set1,
     vector<double> reproj_error;
     unsigned int pts_size = pt_set1.size();
 
-#if 0
-    //Using OpenCV's triangulation
-    //convert to Point2f
-    vector<Point2f> _pt_set1_pt,_pt_set2_pt;
-    KeyPointsToPoints(pt_set1,_pt_set1_pt);
-    KeyPointsToPoints(pt_set2,_pt_set2_pt);
 
-    //undistort
-    Mat pt_set1_pt,pt_set2_pt;
-    undistortPoints(_pt_set1_pt, pt_set1_pt, K, distcoeff);
-    undistortPoints(_pt_set2_pt, pt_set2_pt, K, distcoeff);
-
-    //triangulate
-    Mat pt_set1_pt_2r = pt_set1_pt.reshape(1, 2);
-    Mat pt_set2_pt_2r = pt_set2_pt.reshape(1, 2);
-    Mat pt_3d_h(1,pts_size,CV_32FC4);
-    cv::triangulatePoints(P,P1,pt_set1_pt_2r,pt_set2_pt_2r,pt_3d_h);
-
-    //calculate reprojection
-    vector<Point3f> pt_3d;
-    convertPointsHomogeneous(pt_3d_h.reshape(4, 1), pt_3d);
-    cv::Mat_<double> R = (cv::Mat_<double>(3,3) << P(0,0),P(0,1),P(0,2), P(1,0),P(1,1),P(1,2), P(2,0),P(2,1),P(2,2));
-    Vec3d rvec; Rodrigues(R ,rvec);
-    Vec3d tvec(P(0,3),P(1,3),P(2,3));
-    vector<Point2f> reprojected_pt_set1;
-    projectPoints(pt_3d,rvec,tvec,K,distcoeff,reprojected_pt_set1);
-
-    for (unsigned int i=0; i<pts_size; i++) {
-        CloudPoint cp;
-        cp.pt = pt_3d[i];
-        pointcloud.push_back(cp);
-        reproj_error.push_back(norm(_pt_set1_pt[i]-reprojected_pt_set1[i]));
-    }
-#else
     Mat_<double> KP1 = K * Mat(P1);
-#pragma omp parallel for num_threads(1)
+
     for (int i=0; i<pts_size; i++) {
         Point2f kp = pt_set1[i].pt;
         Point3d u(kp.x,kp.y,1.0);
@@ -160,19 +124,12 @@ double TriangulatePoints(const vector<KeyPoint>& pt_set1,
         Point3d u1(kp1.x,kp1.y,1.0);
         Mat_<double> um1 = Kinv * Mat_<double>(u1);
         u1.x = um1(0); u1.y = um1(1); u1.z = um1(2);
-
+        //triangulation for a point
         Mat_<double> X = IterativeLinearLSTriangulation(u,P,u1,P1);
 
-//		cout << "3D Point: " << X << endl;
-//		Mat_<double> x = Mat(P1) * X;
-//		cout <<	"P1 * Point: " << x << endl;
-//		Mat_<double> xPt = (Mat_<double>(3,1) << x(0),x(1),x(2));
-//		cout <<	"Point: " << xPt << endl;
+        //calculate reproject error for each point
         Mat_<double> xPt_img = KP1 * X;				//reproject
-//		cout <<	"Point * K: " << xPt_img << endl;
         Point2f xPt_img_(xPt_img(0)/xPt_img(2),xPt_img(1)/xPt_img(2));
-
-#pragma omp critical
         {
             double reprj_err = norm(xPt_img_-kp1);
             reproj_error.push_back(reprj_err);
@@ -183,33 +140,16 @@ double TriangulatePoints(const vector<KeyPoint>& pt_set1,
 
             pointcloud.push_back(cp);
             correspImg1Pt.push_back(pt_set1[i]);
-#ifdef __SFM__DEBUG__
-            depths.push_back(X(2));
-#endif
+
         }
+
     }
-#endif
 
     Scalar mse = mean(reproj_error);
     t = ((double)getTickCount() - t)/getTickFrequency();
     cout << "Done. ("<<pointcloud.size()<<"points, " << t <<"s, mean reproj err = " << mse[0] << ")"<< endl;
 
     //show "range image"
-#ifdef __SFM__DEBUG__
-    {
-        double minVal,maxVal;
-        minMaxLoc(depths, &minVal, &maxVal);
-        Mat tmp(240,320,CV_8UC3,Scalar(0,0,0)); //cvtColor(img_1_orig, tmp, CV_BGR2HSV);
-        for (unsigned int i=0; i<pointcloud.size(); i++) {
-            double _d = MAX(MIN((pointcloud[i].z-minVal)/(maxVal-minVal),1.0),0.0);
-            circle(tmp, correspImg1Pt[i].pt, 1, Scalar(255 * (1.0-(_d)),255,255), CV_FILLED);
-        }
-        cvtColor(tmp, tmp, CV_HSV2BGR);
-        imshow("Depth Map", tmp);
-        waitKey(0);
-        destroyWindow("Depth Map");
-    }
-#endif
 
     return mse[0];
 }

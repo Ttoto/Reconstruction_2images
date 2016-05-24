@@ -50,7 +50,6 @@ cv::Mat GetFundamentalMat(const std::vector<KeyPoint>& imgpts1,
     //Try to eliminate keypoints based on the fundamental matrix
     //(although this is not the proper way to do this)
     vector<uchar> status(imgpts1.size());
-    std::vector<KeyPoint> keypoints_1, keypoints_2;
 
     imgpts1_good.clear(); imgpts2_good.clear();
 
@@ -88,8 +87,6 @@ cv::Mat GetFundamentalMat(const std::vector<KeyPoint>& imgpts1,
             } else {
                 new_matches.push_back(matches[i]);
             }
-            keypoints_1.push_back(imgpts1_tmp[i]);
-            keypoints_2.push_back(imgpts2_tmp[i]);
 
         }
     }
@@ -97,7 +94,9 @@ cv::Mat GetFundamentalMat(const std::vector<KeyPoint>& imgpts1,
     cout << matches.size() << " matches before, " << new_matches.size() << " new matches after Fundamental Matrix\n";
     matches = new_matches; //keep only those points who survived the fundamental matrix
 
+
     return F;
+
 }
 
 void TakeSVDOfE(Mat_<double>& E, Mat& svd_u, Mat& svd_vt, Mat& svd_w) {
