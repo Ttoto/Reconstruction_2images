@@ -40,8 +40,10 @@ MainWindow::MainWindow(QWidget *parent) :
          0, 0, 1);
     distcoeff = (Mat_<double>(5,1) << 0.0, 0.0, 0.0, 0, 0);
 
-    imgpts.clear();
-
+    first_image  = 0;
+    second_image = 1;
+    imgpts.resize(2);
+    imgs_orig.resize(2);
 }
 
 MainWindow::~MainWindow()
@@ -108,6 +110,7 @@ void MainWindow::on_file_browser_1_clicked(const QModelIndex &index)
             ui->graphicsView_1->show();
         }
     }
+    imgs_orig[first_image] = imread(filestr.toStdString(),CV_LOAD_IMAGE_COLOR);
 }
 
 void MainWindow::on_file_browser_2_clicked(const QModelIndex &index)
@@ -130,13 +133,15 @@ void MainWindow::on_file_browser_2_clicked(const QModelIndex &index)
             ui->graphicsView_2->show();
         }
     }
+    imgs_orig[second_image] = imread(filestr.toStdString(),CV_LOAD_IMAGE_COLOR);
 }
 
 /* ------------------------------------------------------------------------- */
-/** \fn MainWindow::on_pushButton_Matching_clicked()
+/** \fn void on_pushButton_Matching_clicked()
 *
-* \brief Matching two iamge
+* \brief matches two selected images
 *
+* match two select images, save imgpts and descriptors into the yml files.
 */
 /* ------------------------------------------------------------------------- */
 void MainWindow::on_pushButton_Matching_clicked()
@@ -144,52 +149,39 @@ void MainWindow::on_pushButton_Matching_clicked()
     cv::initModule_nonfree();
 
     QString filestr1;
-    filestr1 = ui->path_1->text();
-    filestr1.append("/");
-    filestr1.append(ui->file_browser_1->currentIndex().data().toString());
     QString filestr2;
-    filestr2 = ui->path_2->text();
-    filestr2.append("/");
-    filestr2.append(ui->file_browser_2->currentIndex().data().toString());
-
-
-    img1_orig = imread(filestr1.toStdString(),CV_LOAD_IMAGE_COLOR);
-    img2_orig = imread(filestr2.toStdString(),CV_LOAD_IMAGE_COLOR);
-
-
-    Mat img1,img2;
-    cvtColor(img1_orig, img1, CV_BGR2GRAY);
-    cvtColor(img2_orig, img2, CV_BGR2GRAY);
-
     filestr1 = ui->path_1->text();
     filestr1.append("/data/");
     filestr1.append(ui->file_browser_1->currentIndex().data().toString());
     filestr1.append(".yml");
-
     filestr2 = ui->path_2->text();
     filestr2.append("/data/");
     filestr2.append(ui->file_browser_2->currentIndex().data().toString());
     filestr2.append(".yml");
 
-    //get the keypoint and descriptions
     if(((access(filestr1.toStdString().c_str(),F_OK))!=-1) &&
             ((access(filestr2.toStdString().c_str(),F_OK))!=-1))
-    {
-        restore_descriptors_from_file(filestr1.toStdString(),imgpts1,descriptors1);
-        restore_descriptors_from_file(filestr2.toStdString(),imgpts2,descriptors2);
+    {//the yml files exist restore imgpts and descriptors from the file
+        restore_descriptors_from_file(filestr1.toStdString(),imgpts[first_image],descriptors1);
+        restore_descriptors_from_file(filestr2.toStdString(),imgpts[second_image],descriptors2);
     }
-    else{
+    else
+    {//if the yml file doesn't exist, we need to calculate it and store it as a file
+        Mat img1,img2;
 
-        matching_get_feature_descriptors(img1,imgpts1,descriptors1);
-        matching_get_feature_descriptors(img2,imgpts2,descriptors2);
+        cvtColor(imgs_orig[first_image], img1, CV_BGR2GRAY);
+        cvtColor(imgs_orig[second_image], img2, CV_BGR2GRAY);
 
-        save_descriptors_to_file(filestr1.toStdString(),imgpts1,descriptors1);
-        save_descriptors_to_file(filestr2.toStdString(),imgpts2,descriptors2);
+        matching_get_feature_descriptors(img1,imgpts[first_image],descriptors1);
+        matching_get_feature_descriptors(img2,imgpts[second_image],descriptors2);
+
+        save_descriptors_to_file(filestr1.toStdString(),imgpts[first_image],descriptors1);
+        save_descriptors_to_file(filestr2.toStdString(),imgpts[second_image],descriptors2);
     }
 
-    cout << filestr1.toStdString() << " has " << imgpts1.size()
+    cout << filestr1.toStdString() << " has " << imgpts[first_image].size()
          << " points (descriptors " << descriptors1.rows << ")" << endl;
-    cout << filestr2.toStdString() << " has " << imgpts2.size()
+    cout << filestr2.toStdString() << " has " << imgpts[second_image].size()
          << " points (descriptors " << descriptors2.rows << ")" << endl;
 
 
@@ -198,11 +190,11 @@ void MainWindow::on_pushButton_Matching_clicked()
 
     matching_good_matching_filter(matches);
 
-
+    //visualization matches
     if(ui->check_view_good_matching->isChecked())
     {
         Mat img_matches;
-        drawMatches( img1_orig, imgpts1, img2_orig, imgpts2,
+        drawMatches( imgs_orig[first_image], imgpts[first_image], imgs_orig[second_image], imgpts[second_image],
                      matches, img_matches, Scalar::all(-1), Scalar::all(-1),
                      vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
         //-- Show detected matches
@@ -214,26 +206,37 @@ void MainWindow::on_pushButton_Matching_clicked()
 }
 
 
-
+/* ------------------------------------------------------------------------- */
+/** \fn void on_pushButton_Matching_clicked()
+*
+* \brief Reconstruction two images and show them
+*
+* Reconstruction can be devide into following step: First calculate the Fundemantal
+* Matrix of two images. Then Multiply the Camera matrix to get the Essential matix.
+* After getting the Essential matix, We apply SVD method to the E matrix to get the
+* Rotation and tansfer of the camera. Finally we use the position information to
+* reconstruct the point cloud and show then in the visualization part/.
+*/
+/* ------------------------------------------------------------------------- */
 
 void MainWindow::on_pushButton_Reconstruction_clicked()
 {
 
     invert(K, Kinv);
 
-    P = cv::Matx34d(1,0,0,0,
-                    0,1,0,0,
-                    0,0,1,0);
-    P1 = cv::Matx34d(1,0,0,50,
-                     0,1,0,0,
-                     0,0,1,0);
+    Pmats[0] = cv::Matx34d(1,0,0,0,
+                           0,1,0,0,
+                           0,0,1,0);
+    Pmats[1] = cv::Matx34d(1,0,0,50,
+                           0,1,0,0,
+                           0,0,1,0);
 
     FindCameraMatrices(K,Kinv,distcoeff,
-                       imgpts1,imgpts2,
-                       img1_very_good_keypoint,img2_very_good_keypoint,
-                       P,P1,
-                       matches,
-                       outCloud);
+                       imgpts[first_image],imgpts[second_image],
+                       img_goodpts1,img_goodpts2,
+                       Pmats[0],Pmats[1],
+            matches,
+            outCloud);
 
     cout<<endl;
     cout<<"sizeof outCloud is "<< outCloud.size()<<endl;
@@ -241,20 +244,15 @@ void MainWindow::on_pushButton_Reconstruction_clicked()
     outCloud.clear();
     std::vector<cv::KeyPoint> correspImg1Pt;
 
-    TriangulatePoints(img1_very_good_keypoint, img2_very_good_keypoint, K, Kinv,distcoeff, P, P1, outCloud, correspImg1Pt);
+    TriangulatePoints(img_goodpts1, img_goodpts2, K, Kinv,distcoeff, Pmats[0], Pmats[1], outCloud, correspImg1Pt);
     cout << "Generate" << outCloud.size() <<" Points" <<endl;
 
-    imgpts.resize(2);
 
-    imgpts[0] = imgpts1;
-    imgpts[1] = imgpts2;
 
-    imgs_orig.resize(2);
-    imgs_orig[0] = img1_orig;
-    imgs_orig[1] = img2_orig;
+    imgpts[0] = imgpts[first_image];
+    imgpts[1] = imgpts[second_image];
 
-    Pmats[0] = P;
-    Pmats[1] = P1;
+
 
     for (unsigned int i=0; i<outCloud.size(); i++)
     {
@@ -291,18 +289,11 @@ void MainWindow::GetRGBForPointCloud(
                 }
                 cv::Point _pt = imgpts[good_view][pt_idx].pt;
                 assert(good_view < imgs_orig.size() && _pt.x < imgs_orig[good_view].cols && _pt.y < imgs_orig[good_view].rows);
-
                 point_colors.push_back(imgs_orig[good_view].at<cv::Vec3b>(_pt));
-
-                //				std::stringstream ss; ss << "patch " << good_view;
-                //				imshow_250x250(ss.str(), imgs_orig[good_view](cv::Range(_pt.y-10,_pt.y+10),cv::Range(_pt.x-10,_pt.x+10)));
             }
         }
-        //		cv::waitKey(0);
         cv::Scalar res_color = cv::mean(point_colors);
         RGBforCloud[i] = (cv::Vec3b(res_color[0],res_color[1],res_color[2])); //bgr2rgb
-//        if(good_view == imgs.size()) //nothing found.. put red dot
-//            RGBforCloud.push_back(cv::Vec3b(255,0,0));
     }
 }
 

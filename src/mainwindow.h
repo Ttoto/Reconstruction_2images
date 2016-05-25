@@ -59,27 +59,21 @@ private:
     QImage                *image1;
     QImage                *image2;
 
-    Mat img1_orig;
-    Mat img2_orig;
+    int first_image;
+    int second_image;
 
+    std::vector<cv::Mat_<cv::Vec3b> > imgs_orig;
     std::vector<std::vector<cv::KeyPoint> > imgpts;
-    vector<KeyPoint> imgpts1,imgpts2;
+
     Mat descriptors1,descriptors2;
 
     vector<DMatch> matches;
-    vector<DMatch> metches_best30;
-
     //after gaining the fundamental matrix
-    vector<DMatch> matches_3;
-    vector<KeyPoint> img1_very_good_keypoint,img2_very_good_keypoint;
+    vector<KeyPoint> img_goodpts1,img_goodpts2;
 
     Mat K;
-
     cv::Mat_<double> Kinv;
     Mat distcoeff;
-
-    cv::Matx34d P;
-    cv::Matx34d P1;
 
     std::map<int,cv::Matx34d> Pmats;
 
@@ -87,12 +81,10 @@ private:
 
     std::vector<cv::Vec3b> pointCloudRGB;
 
-    std::vector<cv::Mat_<cv::Vec3b> > imgs_orig;
-
     void GetRGBForPointCloud(
-        const std::vector<struct CloudPoint>& _pcloud,
-        std::vector<cv::Vec3b>& RGBforCloud
-        );
+            const std::vector<struct CloudPoint>& _pcloud,
+            std::vector<cv::Vec3b>& RGBforCloud
+            );
 
 
     //pop the data to the visualization module
@@ -101,8 +93,6 @@ private:
     const std::vector<cv::Vec3b>& getPointCloudRGB();
 
     std::vector<cv::Matx34d> getCameras();
-
-    //    PointCloudT::Ptr cloud_;
 };
 
 #endif // MAINWINDOW_H

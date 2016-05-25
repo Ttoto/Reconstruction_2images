@@ -53,7 +53,6 @@ LIBS += -lpcl_common            \
         -lpcl_octree            \
         -lpcl_outofcore         \
         -lpcl_features          \
-        -lpcl_visualization     \
         -lflann                 \
         -lqhull                 \
         -lboost_system          \
